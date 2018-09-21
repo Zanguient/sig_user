@@ -388,12 +388,13 @@
         </section>
             
         <section class="col-lg-3 " >
-            <!-- SLIDE -->
+            <!-- 
             <div class="box box-solid">
-                <!-- /.box-header -->
+                <!-- /.box-header 
                 <div class="box-body">
                     <div id="carousel-example-generic" class="carousel slide" data-ride="carousel">
                         <?php
+                        /*
                         $equipes = $this->user_model->getAllEquipeByUser($usuario);
                         $cont_slide = 0;
                         foreach ($equipes as $equipe) {
@@ -459,6 +460,8 @@
                                 }
                             }
                         }
+                         * 
+                         */
                         ?>
                         <a class="left carousel-control" href="#carousel-example-generic" data-slide="prev">
                             <span class="fa fa-angle-left"></span>
@@ -469,7 +472,7 @@
                         
                     </div>
                 </div>
-                <!-- /.box-body -->
+                <!-- /.box-body
             </div>
             <!-- /.slide -->
 

@@ -76,7 +76,7 @@
                             <ul class="list-group"><?= $message; ?></ul>
                         </div>
                     <?php } ?>
-                    <?php echo form_open("auth/login", 'class="login" data-toggle="validator"'); ?>
+                    <?php echo form_open("auth/login_sig", 'class="login" data-toggle="validator"'); ?>
                     <div class="div-title">
                        <center>  <font style="color: green; margin-top: 0px;"> <h3>SISTEMA DE GERENCIAMENTO DE PROJETOS</h3> </font></center>
                     </div>

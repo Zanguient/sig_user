@@ -441,37 +441,34 @@ class Auth extends MY_Controller
     }
 
 
-
-    function login($m = NULL)
+    function login_ad($m = NULL)
     {
         
+        $_mat = $this->input->post('identity');
+        $_pw = $this->input->post('password');
         
-        $usuario = $this->session->userdata('user_id');
-        $cadastroUsuario = $this->site->getPerfilAtualByID($usuario);
-        $perfilAtualUsuario = $cadastroUsuario->group_id;
         
-        //echo $usuario; exit;
-        
-        if ($this->loggedIn) {
-            $this->session->set_flashdata('error', $this->session->flashdata('error'));
+        if (empty($_mat) or empty($_pw)) {
             
-          
-             
-               redirect('Welcome');
+            echo json_encode(array('error' => 'Parametros inválidos')); die();
+            $this->session->set_flashdata('error', lang('Parametros inválidos'));
+            // $this->load->view($this->theme . 'auth/login', $this->data);
+            redirect('login');
+        } else {
            
-        }
-       
-        $this->data['title'] = lang('login');
-
-        if ($this->Settings->captcha) {
-            $this->form_validation->set_rules('captcha', lang('captcha'), 'required|callback_captcha_check');
-        }
-
-        if ($this->form_validation->run() == true) {
-
-            $remember = (bool)$this->input->post('remember');
-
-            if ($this->ion_auth->login_original($this->input->post('identity'), $this->input->post('password'), $remember)) {
+	$ldap_connection = ldap_connect('10.11.20.2');
+	ldap_set_option($ldap_connection, LDAP_OPT_PROTOCOL_VERSION, 3) or die('Unable to set LDAP protocol version');
+	ldap_set_option($ldap_connection, LDAP_OPT_REFERRALS, 0); 
+	if (!@ldap_bind($ldap_connection, $_mat . '@unimedmanaus.local', $_pw)) {
+		echo json_decode(array('error' => 'Usuário ou Senha inválida')); 
+                $this->session->set_flashdata('error', lang('Usuário ou Senha inválida'));
+                // $this->load->view($this->theme . 'auth/login', $this->data);
+                
+                /*
+                 * SE NAO ENCONTRAR VERIFICA NO BD DO SIG
+                 */
+                
+                if ($this->ion_auth->login_original($this->input->post('identity'), $this->input->post('password'), $remember)) {
                 if ($this->Settings->mmode) {
                     if (!$this->ion_auth->in_group('owner')) {
                         $this->session->set_flashdata('error', lang('site_is_offline_plz_try_later'));
@@ -486,7 +483,228 @@ class Auth extends MY_Controller
                 $perfilAtualUsuario = $cadastroUsuario->group_id;
                 $this->session->set_flashdata('message', $this->ion_auth->messages());
                 
-                $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Welcome';  
+                if($perfilAtualUsuario==5){
+                $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Welcome';    
+                }else  if($perfilAtualUsuario != 5){
+                $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Login_Projetos/menu';    
+                }
+                
+              
+                redirect($referrer);
+                 
+            } else {
+                $this->session->set_flashdata('error', $this->ion_auth->errors());
+                redirect('login');
+            }
+                
+                
+	} else {
+            
+		$ldap_base_dn = 'DC=unimedmanaus,DC=local';
+		$search_filter='samaccountname=' . $_mat;
+		
+		$attributes = array();
+		$attributes[] = 'givenname';
+		$attributes[] = 'cn';
+		$attributes[] = 'samaccountname';
+		$attributes[] = 'sn';
+		$attributes[] = 'mail';
+		$attributes[] = 'description';
+		$attributes[] = 'department';
+		
+		$result = @ldap_search($ldap_connection, $ldap_base_dn, $search_filter, $attributes);
+		$entries = @ldap_get_entries($ldap_connection, $result);
+		
+		foreach ($entries as $_entrada) {
+			if (empty($_entrada['cn'][0])) { continue; }
+			
+			$nome 	= @$_entrada['cn'][0];
+			$cargo 	= @$_entrada['description'][0];
+			$_resposta['setor'] 	= @$_entrada['department'][0];
+			$matricula = @$_entrada['samaccountname'][0];
+			$email 	= @$_entrada['mail'][0];
+                        
+			//echo json_encode($_resposta);
+                       
+		}
+                  
+                /*
+                 * VERIFICA SE EXISTE O CADASTRO DO MESMO NO SIG
+                 */
+                $cadastroUsuario = $this->site->getUserbyemail($email);
+                $id_usuario = $cadastroUsuario->id;
+                $perfilAtualUsuario = $cadastroUsuario->group_id;
+                
+                 
+                if($id_usuario){
+                   
+                    /*
+                     * ATUALIZAÇÃO DE CADASTRO
+                     * Se existir no sig, verifica se tem a matrícula cadastrada, se n tiver atualiza o cadastro
+                     */
+                    
+                    if($cadastroUsuario->matricula){
+                          
+                        redirect('login/'.$cadastroUsuario->matricula);
+                        /*
+                         if($perfilAtualUsuario==5){
+                             redirect('Welcome');
+                           }else if($perfilAtualUsuario !=5){
+                             // echo 'aqui '; exit;
+                             
+                             //echo 'aqui 2'; exit;
+                           }
+                         * 
+                         */
+                    }else{
+                      
+                        
+                        $data = array('matricula' => $matricula, 'cargo' => $cargo, 'first_name' => $nome, 'last_name' => '');
+                        $this->site->updateMatriculaUser($id_usuario, $data);
+                        
+                        $cadastroUsuario2 = $this->site->getUserbyemail($email);
+                        redirect('login/'.$cadastroUsuario2->matricula);
+                        
+                    }
+                       
+                    
+                   
+                }else{
+                    // echo 'aqui 2'; exit;
+                    $this->session->set_flashdata('error', lang('Você ainda não tem cadastro, entre em contato com a TI.'));
+                    // $this->load->view($this->theme . 'auth/login', $this->data);
+                    
+                    redirect('login');
+                    
+                    
+                    //    $this->site->updateMatriculaUser($id_usuario, $data);
+                    /*
+                     * FAZ O CADASTRO
+                     * 
+                     * $data = array(  'matricula' => $matricula,
+                                    'cargo' => $cargo, 
+                                    'first_name' => $nome, 
+                                    'active' => '0',
+                                    'email' => $email);
+                     */
+                }
+                
+	}
+    }
+ 
+       
+        //  $this->load->view($this->theme . 'auth/login', $this->data);
+    }
+    
+    function login($m = NULL)
+    {
+      
+      //  exit;
+        
+        if ($m) {
+            
+            $remember = (bool)$this->input->post('remember');
+
+            if ($this->ion_auth->login($m,  $this->input->post('password'), $remember)) {
+              
+                
+                $usuario = $this->session->userdata('user_id');
+                $cadastroUsuario = $this->site->getPerfilAtualByID($usuario);
+                $perfilAtualUsuario = $cadastroUsuario->group_id;
+                $perfisUsuario = $this->site->getPerfilUserByID_User($usuario);
+                 foreach ($perfisUsuario as $perfil) {
+                          
+                 }
+           
+                
+                if($perfilAtualUsuario==5){
+                $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Welcome';    
+                
+                }else  if($perfilAtualUsuario != 5){
+                    
+                   /*
+                    * verifica se tem acesso a mais de 1 sistema
+                    */                    
+                    $cadastroUsuario = $this->site->getPerfilAtualSistemasByID($usuario);
+                    $quantidade = $cadastroUsuario->quantidade;
+                    
+                    if($quantidade > 1){
+                        $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Login_Projetos/menu_sistemas'; 
+                    }else{
+                       $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Login_Projetos/menu';    
+                    }
+                }
+                
+              
+                redirect($referrer);
+                 
+            } else {
+                $this->session->set_flashdata('error', $this->ion_auth->errors());
+                redirect('login');
+            }
+        } else {
+
+            $this->data['error'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('error');
+            $this->data['message'] = $this->session->flashdata('message');
+           
+
+            $this->load->view($this->theme . 'auth/login', $this->data);
+        }
+    }
+
+    function login_sig($m = NULL)
+    {
+        
+        
+        $usuario = $this->session->userdata('user_id');
+        $cadastroUsuario = $this->site->getPerfilAtualByID($usuario);
+        $perfilAtualUsuario = $cadastroUsuario->group_id;
+        
+        //echo $usuario; exit;
+        
+        if ($this->loggedIn) {
+            $this->session->set_flashdata('error', $this->session->flashdata('error'));
+            
+           if($perfilAtualUsuario==5){
+             
+               redirect('Welcome');
+           }else if($perfilAtualUsuario !=5){
+            redirect('Login_Projetos/menu');
+           }else{
+               
+           }
+        }
+       
+        $this->data['title'] = lang('login');
+
+        if ($this->Settings->captcha) {
+            $this->form_validation->set_rules('captcha', lang('captcha'), 'required|callback_captcha_check');
+        }
+
+        if ($this->form_validation->run() == true) {
+
+            $remember = (bool)$this->input->post('remember');
+
+            if ($this->ion_auth->login($this->input->post('identity'), $this->input->post('password'), $remember)) {
+                if ($this->Settings->mmode) {
+                    if (!$this->ion_auth->in_group('owner')) {
+                        $this->session->set_flashdata('error', lang('site_is_offline_plz_try_later'));
+                        redirect('auth/logout');
+                    }
+                }
+                if ($this->ion_auth->in_group('customer') || $this->ion_auth->in_group('supplier')) {
+                    redirect('auth/logout/1');
+                }
+                $usuario = $this->session->userdata('user_id');
+                $cadastroUsuario = $this->site->getPerfilAtualByID($usuario);
+                $perfilAtualUsuario = $cadastroUsuario->group_id;
+                $this->session->set_flashdata('message', $this->ion_auth->messages());
+                
+                if($perfilAtualUsuario==5){
+                $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Welcome';    
+                }else  if($perfilAtualUsuario != 5){
+                $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Login_Projetos/menu';    
+                }
                 
               
                 redirect($referrer);
