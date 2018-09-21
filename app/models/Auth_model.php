@@ -682,7 +682,7 @@ class Auth_model extends CI_Model
     
     public function login_original($identity, $password, $remember = FALSE)
     {
-       // echo 'aqui'; exit;
+        
         $this->trigger_events('pre_login');
 
         if (empty($identity) || empty($password)) {

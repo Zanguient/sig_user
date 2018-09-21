@@ -660,32 +660,24 @@ class Auth extends MY_Controller
         $cadastroUsuario = $this->site->getPerfilAtualByID($usuario);
         $perfilAtualUsuario = $cadastroUsuario->group_id;
         
-        //echo $usuario; exit;
+       
         
         if ($this->loggedIn) {
             $this->session->set_flashdata('error', $this->session->flashdata('error'));
             
-           if($perfilAtualUsuario==5){
-             
-               redirect('Welcome');
-           }else if($perfilAtualUsuario !=5){
-            redirect('Login_Projetos/menu');
-           }else{
-               
-           }
+          redirect('Welcome');
         }
        
         $this->data['title'] = lang('login');
 
-        if ($this->Settings->captcha) {
-            $this->form_validation->set_rules('captcha', lang('captcha'), 'required|callback_captcha_check');
-        }
+        $this->form_validation->set_rules('identity', lang("Login"), 'required');
+        $this->form_validation->set_rules('password', lang("Senha"), 'required');
 
         if ($this->form_validation->run() == true) {
 
             $remember = (bool)$this->input->post('remember');
-
-            if ($this->ion_auth->login($this->input->post('identity'), $this->input->post('password'), $remember)) {
+            
+            if ($this->ion_auth->login_original($this->input->post('identity'), $this->input->post('password'), $remember)) {
                 if ($this->Settings->mmode) {
                     if (!$this->ion_auth->in_group('owner')) {
                         $this->session->set_flashdata('error', lang('site_is_offline_plz_try_later'));
@@ -700,12 +692,7 @@ class Auth extends MY_Controller
                 $perfilAtualUsuario = $cadastroUsuario->group_id;
                 $this->session->set_flashdata('message', $this->ion_auth->messages());
                 
-                if($perfilAtualUsuario==5){
-                $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Welcome';    
-                }else  if($perfilAtualUsuario != 5){
-                $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Login_Projetos/menu';    
-                }
-                
+                $referrer = $this->session->userdata('requested_page') ? $this->session->userdata('requested_page') : 'Welcome';   
               
                 redirect($referrer);
                  
